@@ -1,26 +1,46 @@
 import { model, Schema } from "mongoose";
 
-const sellerSchema = Schema(
+const sellerSchema = new Schema(
   {
-    ownerName: { type: String, required: true },
-    email: { type: String, unique: true, required: true },
-    password: { type: String, required: true },
-
-    role: { type: String, default: "seller" },
-
-    sellerType: {
+    ownerName: {
       type: String,
-      enum: ["restaurant", "food", "grocery"],
+      required: true,
+      trim: true,
+    },
+
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true,
+    },
+
+    password: {
+      type: String,
       required: true,
     },
 
+    role: {
+      type: String,
+      default: "seller",
+    },
+
+    // ALLOW ALL 3 TYPES
+    sellerType: {
+      type: String,
+      enum: ["food", "restaurant", "grocery"],
+      default: "food",
+      required: true,
+    },
+
+    // Links to FoodStore OR Restaurant OR Grocery model
     sellerTypeId: {
-      type: Schema.Types.ObjectId, // NO REF HERE
-      required: false,
+      type: Schema.Types.ObjectId,
+      default: null,
     },
   },
   { timestamps: true }
 );
 
-const Seller = model("seller", sellerSchema);
-export default Seller;
+export default model("seller", sellerSchema);

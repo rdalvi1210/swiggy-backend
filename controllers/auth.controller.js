@@ -1,225 +1,232 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import FoodStore from "../models/food.model.js";
+
+import FoodStore from "../models/foodstore.model.js";
 import Grocery from "../models/groceries.model.js";
 import Restaurant from "../models/restaurants.model.js";
 import Seller from "../models/seller.model.js";
 import User from "../models/user.model.js";
 
+// =====================================================
+// USER REGISTER
+// =====================================================
 export const registerUser = async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password } = req.body;
 
-    if (!name || !email || !password || !role) {
-      return res.status(400).json({
-        success: false,
-        message: "All fields are required.",
-      });
+    if (!name || !email || !password) {
+      return res
+        .status(400)
+        .json({ success: false, message: "All fields are required." });
     }
 
-    // Check if user exists
-    const userExist = await User.findOne({ email });
-    if (userExist) {
-      return res.status(409).json({
-        success: false,
-        message: "User already exists.",
-      });
+    const exist = await User.findOne({ email });
+    if (exist) {
+      return res
+        .status(409)
+        .json({ success: false, message: "User already exists." });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashed = await bcrypt.hash(password, 10);
 
-    // Create new user
-    const newUser = await User.create({
-      name,
-      email,
-      password: hashedPassword,
-      role,
-    });
+    const newUser = await User.create({ name, email, password: hashed });
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: "User registered successfully.",
       user: {
         _id: newUser._id,
         name: newUser.name,
         email: newUser.email,
-        role: newUser.role,
       },
     });
   } catch (err) {
-    res.status(500).json({
-      success: false,
-      message: "Server error",
-    });
+    return res.status(500).json({ success: false, message: "Server error." });
   }
 };
 
+// =====================================================
+// LOGIN (USER + SELLER)
+// =====================================================
 export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
+    if (!email || !password)
+      return res
+        .status(400)
+        .json({ success: false, message: "Email and password are required." });
 
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "Email and password are required.",
-      });
+    let account = await User.findOne({ email });
+    let accountType = "user";
+
+    // Try seller if no user
+    if (!account) {
+      account = await Seller.findOne({ email });
+      accountType = "seller";
     }
 
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found.",
-      });
-    }
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid credentials.",
-      });
-    }
+    if (!account)
+      return res
+        .status(404)
+        .json({ success: false, message: "Account not found." });
+
+    const match = await bcrypt.compare(password, account.password);
+    if (!match)
+      return res
+        .status(401)
+        .json({ success: false, message: "Invalid credentials." });
+
     const token = jwt.sign(
-      { userId: user._id, role: user.role },
+      { id: account._id, role: account.role },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
-    res.cookie("token", token, {
+
+    const cookieName = accountType === "user" ? "token" : "seller_token";
+
+    res.cookie(cookieName, token, {
       httpOnly: true,
-      secure: false, // change to true in production with HTTPS
       sameSite: "strict",
+      secure: false,
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
     return res.status(200).json({
       success: true,
       message: "Login successful.",
-      user: {
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
+      accountType,
+      data: {
+        _id: account._id,
+        name: account.name,
+        email: account.email,
+        role: account.role,
       },
-      token,
     });
   } catch (err) {
-    return res.status(500).json({
-      success: false,
-      message: "Server error.",
-    });
+    console.log("LOGIN ERROR:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Internal server error." });
   }
 };
 
+// =====================================================
+// GET CURRENT ACCOUNT (USER or SELLER)
+// =====================================================
 export const getCurrentUser = async (req, res) => {
   try {
-    const { userId } = req.user;
-    const user = await User.findById(userId).select("-password");
+    const { id, role } = req.user;
 
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found.",
-      });
-    }
+    const model = role === "user" ? User : Seller;
 
-    res.status(200).json({
-      success: true,
-      user,
-    });
+    const account = await model.findById(id).select("-password");
+    if (!account)
+      return res
+        .status(404)
+        .json({ success: false, message: "Account not found" });
+
+    return res.status(200).json({ success: true, accountType: role, account });
   } catch (err) {
-    res.status(500).json({
-      success: false,
-      message: "Server error",
-    });
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
+// =====================================================
+// LOGOUT
+// =====================================================
 export const logoutUser = async (req, res) => {
-  try {
-    res.clearCookie("token", {
-      httpOnly: true,
-      secure: false, // set true in production
-      sameSite: "strict",
-    });
-
-    return res.status(200).json({
-      success: true,
-      message: "Logged out successfully.",
-    });
-  } catch (err) {
-    return res.status(500).json({
-      success: false,
-      message: "Server error.",
-    });
-  }
+  res.clearCookie("token");
+  res.clearCookie("seller_token");
+  return res
+    .status(200)
+    .json({ success: true, message: "Logged out successfully." });
 };
 
-// Seller Controller
-// ===========================
-// REGISTER SELLER
-// ===========================
+// =====================================================
+// REGISTER SELLER (restaurant / food / grocery)
+// =====================================================
 export const registerSeller = async (req, res) => {
   try {
     const { ownerName, email, password, sellerType } = req.body;
 
-    // 1. Validate fields
     if (!ownerName || !email || !password || !sellerType) {
-      return res.status(400).json({
-        success: false,
-        message: "All fields are required.",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "All fields are required." });
     }
 
-    // Only 3 types allowed
     if (!["restaurant", "food", "grocery"].includes(sellerType)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid sellerType.",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid sellerType." });
     }
 
-    // 2. Check duplicate seller
     const exist = await Seller.findOne({ email });
     if (exist) {
-      return res.status(409).json({
-        success: false,
-        message: "Seller already exists.",
-      });
+      return res
+        .status(409)
+        .json({ success: false, message: "Seller already exists." });
     }
 
-    // 3. Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashed = await bcrypt.hash(password, 10);
 
-    // 4. Create seller
     const seller = await Seller.create({
       ownerName,
       email,
-      password: hashedPassword,
+      password: hashed,
       sellerType,
     });
 
-    // 5. Create details based on sellerType
     let details;
 
+    // ======================================
+    // RESTAURANT
+    // ======================================
     if (sellerType === "restaurant") {
-      details = await Restaurant.create({ sellerId: seller._id });
-    }
-    if (sellerType === "food") {
-      details = await FoodStore.create({ sellerId: seller._id });
-    }
-    if (sellerType === "grocery") {
-      details = await Grocery.create({ sellerId: seller._id });
-    }
-
-    // Safety check
-    if (!details) {
-      return res.status(500).json({
-        success: false,
-        message: "Failed to create seller details.",
+      details = await Restaurant.create({
+        sellerId: seller._id,
+        businessName: "",
+        address: "",
+        cuisines: [],
+        deliveryTime: "",
+        openingTime: "",
+        closingTime: "",
+        coverImage: "",
+        menuItems: [],
       });
     }
 
-    // 6. Attach detailId to seller
+    // ======================================
+    // FOOD STORE
+    // ======================================
+    if (sellerType === "food") {
+      details = await FoodStore.create({
+        sellerId: seller._id,
+        storeName: "",
+        address: "",
+        cuisines: [],
+        deliveryTime: "",
+        openingTime: "",
+        closingTime: "",
+        coverImage: "",
+        productList: [],
+      });
+    }
+
+    // ======================================
+    // GROCERY
+    // ======================================
+    if (sellerType === "grocery") {
+      details = await Grocery.create({
+        sellerId: seller._id,
+        storeName: "",
+        address: "",
+        warehouseLocation: "",
+        deliveryTime: "",
+        inventory: [],
+      });
+    }
+
     seller.sellerTypeId = details._id;
     await seller.save();
 
@@ -229,97 +236,10 @@ export const registerSeller = async (req, res) => {
       seller,
       details,
     });
-
-  } catch (error) {
-    console.error("REGISTER SELLER ERROR:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Internal server error.",
-    });
-  }
-};
-
-
-
-// ===========================
-// LOGIN SELLER
-// ===========================
-export const loginSeller = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    // Validation
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "Email and password are required.",
-      });
-    }
-
-    // Check seller
-    const seller = await Seller.findOne({ email });
-    if (!seller) {
-      return res.status(404).json({
-        success: false,
-        message: "Seller not found.",
-      });
-    }
-
-    // Compare password
-    const isMatch = await bcrypt.compare(password, seller.password);
-    if (!isMatch) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid credentials.",
-      });
-    }
-
-    // Generate token
-    const token = jwt.sign(
-      {
-        sellerId: seller._id,
-        role: seller.role,
-        sellerType: seller.sellerType,
-        sellerTypeId: seller.sellerTypeId,
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
-
-    // Set cookie
-    res.cookie("seller_token", token, {
-      httpOnly: true,
-      sameSite: "strict",
-      secure: false, // set to true for production HTTPS
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
-
-    // Fetch details based on seller type
-    let details = null;
-
-    if (seller.sellerType === "restaurant") {
-      details = await Restaurant.findById(seller.sellerTypeId);
-    }
-    if (seller.sellerType === "food") {
-      details = await FoodStore.findById(seller.sellerTypeId);
-    }
-    if (seller.sellerType === "grocery") {
-      details = await Grocery.findById(seller.sellerTypeId);
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: "Login successful.",
-      seller,
-      details,
-      token,
-    });
-
-  } catch (error) {
-    console.error("LOGIN SELLER ERROR:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Internal server error.",
-    });
+  } catch (err) {
+    console.log("REGISTER SELLER ERROR:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Internal server error." });
   }
 };

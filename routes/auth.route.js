@@ -1,23 +1,30 @@
 import { Router } from "express";
 import {
-  getCurrentUser,
-  loginSeller,
+  registerUser,
   loginUser,
+  getCurrentUser,
   logoutUser,
   registerSeller,
-  registerUser,
 } from "../controllers/auth.controller.js";
+
 import { verifyToken } from "../middleware/verifyToken.js";
 
 const authRouter = Router();
 
+// -----------------------------
+// USER AUTH
+// -----------------------------
 authRouter.post("/register", registerUser);
 authRouter.post("/login", loginUser);
-authRouter.get("/getCurrentUser", verifyToken, getCurrentUser);
-authRouter.post("/logout", verifyToken, logoutUser);
+authRouter.get("/me", verifyToken, getCurrentUser);
 
-//seller
+// LOGOUT – NO verifyToken
+authRouter.get("/logout", logoutUser);
 
-authRouter.post("/seller-login", loginSeller);
+// -----------------------------
+// SELLER AUTH
+// -----------------------------
 authRouter.post("/seller-register", registerSeller);
+// seller login uses same /login
+
 export default authRouter;
