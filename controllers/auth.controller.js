@@ -243,3 +243,36 @@ export const registerSeller = async (req, res) => {
       .json({ success: false, message: "Internal server error." });
   }
 };
+
+/* ============================================================
+   ADD NEW ADDRESS  (ONLY THIS FUNCTION)
+   ============================================================ */
+
+export const addAddress = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { pincode, fullAddress, label } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user)
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+
+    // Replace existing address
+    user.addresses = [{ pincode, fullAddress, label: label || "Home" }];
+
+    await user.save();
+
+    res.json({
+      success: true,
+      user,
+      message: "Address updated",
+    });
+  } catch (err) {
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to update address" });
+  }
+};
+
