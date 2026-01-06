@@ -1,4 +1,3 @@
-import Order from "../models/foodorder.model.js";
 import FoodStore from "../models/foodstore.model.js";
 
 // ===========================================
@@ -77,3 +76,49 @@ export const updateFoodStore = async (req, res) => {
   }
 };
 
+export const searchStoresByName = async (req, res) => {
+  try {
+    const q = req.query.q?.trim();
+
+    // 🚫 No search query → return empty
+    if (!q) {
+      return res.status(200).json({
+        count: 0,
+        stores: [],
+      });
+    }
+
+    const searchRegex = new RegExp(q, "i");
+
+    const stores = await FoodStore.find({
+      $or: [
+        { storeName: searchRegex },
+        { address: searchRegex },
+        { cuisines: searchRegex }, // ✅ better for array
+      ],
+    })
+      .select("storeName address cuisines deliveryTime coverImage")
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .lean(); // 🔥 performance boost
+
+    const formattedStores = stores.map((store) => ({
+      storeId: store._id,
+      storeName: store.storeName,
+      address: store.address,
+      cuisines: store.cuisines,
+      deliveryTime: store.deliveryTime,
+      coverImage: store.coverImage,
+    }));
+
+    return res.status(200).json({
+      count: formattedStores.length,
+      stores: formattedStores,
+    });
+  } catch (error) {
+    console.error("Store search error:", error);
+    return res.status(500).json({
+      message: "Failed to search stores",
+    });
+  }
+};

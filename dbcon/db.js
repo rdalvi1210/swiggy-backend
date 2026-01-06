@@ -2,7 +2,9 @@ import mongoose from "mongoose";
 
 export function connectDB() {
   mongoose
-    .connect("mongodb://localhost:27017/swiggyDb")
+    .connect(
+      "mongodb+srv://rdalvi1210:9876543210@cluster0.0vqrqtj.mongodb.net/"
+    )
     .then(() => {
       console.log("Connected to MongoDB");
     })

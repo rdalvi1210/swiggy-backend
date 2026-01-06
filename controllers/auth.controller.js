@@ -117,7 +117,7 @@ export const getCurrentUser = async (req, res) => {
   try {
     const { id, role } = req.user;
 
-    const model = role === "user" ? User : Seller;
+    const model = role === "user" || role === "admin" ? User : Seller;
 
     const account = await model.findById(id).select("-password");
     if (!account)
@@ -275,4 +275,3 @@ export const addAddress = async (req, res) => {
       .json({ success: false, message: "Failed to update address" });
   }
 };
-

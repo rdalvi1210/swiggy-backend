@@ -1,6 +1,7 @@
 import express from "express";
 import {
   getFoodStore,
+  searchStoresByName,
   updateFoodStore,
 } from "../controllers/foodstore.controller.js";
 import { verifyToken } from "../middleware/verifyToken.js";
@@ -8,6 +9,7 @@ import { verifyToken } from "../middleware/verifyToken.js";
 const foodStoreRouter = express.Router();
 
 // PUBLIC: GET FOOD STORE INFO
+foodStoreRouter.get("/search", searchStoresByName);
 foodStoreRouter.get("/:storeId", getFoodStore);
 
 // PROTECTED: UPDATE STORE INFO (SELLERS ONLY)

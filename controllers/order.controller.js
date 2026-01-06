@@ -155,3 +155,82 @@ export const getSellerOrders = async (req, res) => {
     });
   }
 };
+
+export const getOrderById = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { id } = req.params;
+
+    const order = await Order.findOne({
+      _id: id,
+      userId, // 🔐 user can fetch only their own order
+    }).populate("storeId", "storeName coverImage");
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found",
+      });
+    }
+
+    // Format response exactly per schema
+    const formattedOrder = {
+      _id: order._id,
+      createdAt: order.createdAt,
+      updatedAt: order.updatedAt,
+
+      // Status
+      orderStatus: order.orderStatus,
+
+      // Pricing
+      orderTotal: order.orderTotal,
+
+      // Payment
+      paymentMethod: order.paymentMethod,
+      paymentStatus: order.paymentStatus,
+      paymentDetails: order.paymentDetails || {},
+
+      // Address snapshot
+      address: {
+        label: order.address?.label || "",
+        fullAddress: order.address?.fullAddress || "",
+        pincode: order.address?.pincode || "",
+      },
+
+      // Items
+      items: order.items.map((item) => ({
+        productId: item.productId,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        image: item.image,
+        isVeg: item.isVeg,
+      })),
+
+      // Store snapshot
+      store: order.storeId
+        ? {
+            _id: order.storeId._id,
+            storeName: order.storeId.storeName,
+            coverImage: order.storeId.coverImage,
+          }
+        : {
+            _id: null,
+            storeName: "Store Removed",
+            coverImage:
+              "https://cdn-icons-png.flaticon.com/512/2748/2748558.png",
+          },
+    };
+
+    return res.status(200).json({
+      success: true,
+      order: formattedOrder,
+    });
+  } catch (error) {
+    console.error("GET ORDER BY ID ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch order",
+    });
+  }
+};
