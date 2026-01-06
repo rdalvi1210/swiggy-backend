@@ -8,12 +8,20 @@ import mainRouter from "./routes/index.js";
 dotenv.config();
 
 const app = express();
+
+// ✅ Required for Render (secure cookies + proxy)
 app.set("trust proxy", 1);
 
 const PORT = process.env.PORT || 3000;
 
-// Middleware
+// ======================
+// MIDDLEWARE (ORDER MATTERS)
+// ======================
 
+// 1️⃣ Parse cookies first
+app.use(cookieParser());
+
+// 2️⃣ CORS (must allow credentials)
 app.use(
   cors({
     origin: [
@@ -23,27 +31,31 @@ app.use(
     credentials: true,
   })
 );
+
+// 3️⃣ Parse JSON
 app.use(express.json());
-app.use(cookieParser());
 
-// Basic Route
-
+// ======================
+// ROUTES
+// ======================
 app.use("/api/v1", mainRouter);
 
 app.get("/", (req, res) => {
-  res.send("Hello, World!");
+  res.send("Backend running successfully 🚀");
 });
 
+// ======================
+// START SERVER
+// ======================
 const startServer = async () => {
   try {
     await connectDB();
-
     app.listen(PORT, () => {
-      console.log(`Server running at http://localhost:${PORT}`);
+      console.log(`Server running on port ${PORT}`);
     });
   } catch (err) {
     console.error("DB connection failed:", err.message);
-    process.exit(1); // stop the app
+    process.exit(1);
   }
 };
 
