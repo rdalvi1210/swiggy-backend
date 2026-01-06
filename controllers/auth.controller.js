@@ -88,6 +88,8 @@ export const loginUser = async (req, res) => {
       httpOnly: true,
       sameSite: "none",
       secure: true,
+      path: "/",
+      partitioned: true,
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
