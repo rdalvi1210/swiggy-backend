@@ -196,7 +196,6 @@ export const searchProducts = async (req, res) => {
 export const getRestaurantsByCategory = async (req, res) => {
   try {
     const { category } = req.query;
-    console.log(category);
     if (!category) {
       return res.status(400).json({
         success: false,
@@ -224,7 +223,6 @@ export const getRestaurantsByCategory = async (req, res) => {
     });
   }
 };
-
 
 export const getProductsOfStoreByCategory = async (req, res) => {
   try {
